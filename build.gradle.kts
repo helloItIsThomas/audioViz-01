@@ -2,6 +2,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.net.URI
 
 group = "org.openrndr.template"
 version = "1.0.0"
@@ -104,6 +105,10 @@ plugins {
 repositories {
     mavenCentral()
     mavenLocal()
+    maven {
+        name = "TarsosDSP repository"
+        url = URI("https://mvn.0110.be/releases")
+    }
 }
 
 dependencies {
@@ -112,6 +117,8 @@ dependencies {
 //    implementation(libs.gson)
 //    implementation(libs.csv)
 
+    implementation("be.tarsos.dsp:core:2.5")
+    implementation("be.tarsos.dsp:jvm:2.5")
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.slf4j.api)
     implementation(libs.kotlin.logging)

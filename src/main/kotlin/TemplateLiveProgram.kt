@@ -1,4 +1,7 @@
 
+import be.tarsos.dsp.AudioEvent
+import be.tarsos.dsp.io.jvm.AudioPlayer
+import be.tarsos.dsp.onsets.PercussionOnsetDetector
 import classes.CButton
 import classes.CSlider
 import demos.classes.Animation
@@ -21,6 +24,14 @@ import org.openrndr.shape.Rectangle
 import org.openrndr.shape.findShapes
 import org.openrndr.svg.loadSVG
 import java.io.File
+import javax.sound.sampled.AudioFormat
+import javax.sound.sampled.AudioInputStream
+import javax.sound.sampled.DataLine
+import javax.sound.sampled.TargetDataLine
+import kotlin.math.sqrt
+
+@Volatile
+var isRunning = true
 
 
 @OptIn(DelicateCoroutinesApi::class)
@@ -79,6 +90,84 @@ fun main() = application {
             a.loadFromJson(File("data/keyframes/keyframes-0.json"))
         }
         val globalSpeed = 0.01
+
+
+
+//        val stSR = 44100.0f
+        val stSR = 48000.0f
+
+        val format = AudioFormat(
+            48000.0f, // Sample Rate
+            16,       // Sample Size In Bits
+            2,        // Channels
+            true,     // Signed
+            false     // Little Endian
+        )
+
+        val tarsosFormat = createTarsosFormat(format)
+        val player = AudioPlayer(format)
+        val dataLineInfo = DataLine.Info(TargetDataLine::class.java, format)
+        val line = getTargetDataLine( dataLineInfo )
+        val audioByteBuffer = ByteArray(line!!.bufferSize)
+        animation.loadFromJson(File("data/keyframes/keyframes-0.json"))
+
+        val myOnsetHandler = { time: Double, salience: Double ->
+            println("Onset detected at time: $time with salience: $salience")
+        }
+
+        val detectors = listOf(
+            PercussionOnsetDetector(48000f, 1024, myOnsetHandler, 0.05, 0.05),
+            PercussionOnsetDetector(48000f, 512, myOnsetHandler, 0.1, 0.1),
+            PercussionOnsetDetector(48000f, 2048, myOnsetHandler, 0.02, 0.02),
+            PercussionOnsetDetector(48000f, 1024, myOnsetHandler, 0.2, 0.1),
+            PercussionOnsetDetector(44100f, 1024, myOnsetHandler, 0.05, 0.05),
+            PercussionOnsetDetector(48000f, 256, myOnsetHandler, 0.2, 0.2),
+            PercussionOnsetDetector(48000f, 4096, myOnsetHandler, 0.01, 0.01),
+            PercussionOnsetDetector(44100f, 512, myOnsetHandler, 0.1, 0.2),
+            PercussionOnsetDetector(48000f, 1024, myOnsetHandler, 0.3, 0.05),
+            PercussionOnsetDetector(48000f, 768, myOnsetHandler, 0.1, 0.05)
+        )
+
+
+
+//        myOnsetHandler.handleOnset(0.0, 0.0)
+
+
+        val percDetect = detectors[0]
+
+        line.open(format)
+        line.start()
+        val stream = AudioInputStream(line)
+
+        Thread {
+            while(isRunning) {
+                while (true) {
+                    val bytesRead = stream.read(audioByteBuffer)
+                    if (bytesRead > 0) {
+                        val audioEvent = AudioEvent( tarsosFormat )
+                        audioEvent.floatBuffer = FloatArray(
+                            bytesRead / 2
+                        ) { i ->
+                            (audioByteBuffer[i * 2].toInt() shl 8 or (audioByteBuffer[i * 2 + 1].toInt() and 0xFF)) / 32768.0f
+                        }
+
+//                        println("Sending buffer to detector: ${audioEvent.floatBuffer.take(5)}")
+                        percDetect.process( audioEvent )
+//                        println("Detector has processed the buffer.")
+
+                        val rms = sqrt(
+                            audioByteBuffer.map { it * it }.average()
+                        )
+                        if (rms < 0.01) {
+                            println("Captured silence")
+                        } else {
+//                            println("Captured audio")
+                        }
+                    }
+                }
+            }
+        }.start()
+        println("doign styuff")
 
 
 
